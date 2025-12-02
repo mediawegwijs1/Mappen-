@@ -1,0 +1,620 @@
+html = r"""<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mappenstudio – downloaden & opslaan</title>
+  <style>
+    :root{
+      --bg: linear-gradient(135deg,#f5f7ff 0%, #fef7ff 100%);
+      --card:#ffffff; --ink:#0f172a; --muted:#64748b; --line:#e5e7eb;
+      --brand:#2563eb; --brand-soft:#e0e7ff;
+      --ok:#10b981; --bad:#ef4444; --warn:#f59e0b;
+      --accent:#7c3aed; --accent-soft:#f5f3ff;
+      --radius:16px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial;background:var(--bg);color:var(--ink)}
+    header{position:sticky;top:0;background:linear-gradient(180deg,#fff,rgba(255,255,255,.92));backdrop-filter:saturate(140%) blur(6px);border-bottom:1px solid var(--line);z-index:10}
+    .wrap{max-width:1100px;margin:0 auto;padding:16px}
+    h1{font-size:22px;margin:0}
+    .subtitle{font-size:13px;color:var(--muted);margin-top:4px}
+    .section{max-width:1100px;margin:16px auto;padding:0 16px}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:0 10px 35px rgba(31,41,55,.06)}
+    .toolbar{display:flex;gap:8px;align-items:center;padding:12px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+    .toolbar .step{display:flex;align-items:center;gap:10px;font-weight:700}
+    .step .num{width:34px;height:34px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:var(--accent);color:#fff;box-shadow:0 4px 12px rgba(124,58,237,.25)}
+    button{border:1px solid var(--line);background:#fff;border-radius:12px;padding:10px 14px;cursor:pointer;transition:.2s transform}
+    button.primary{background:var(--brand);color:#fff;border-color:transparent}
+    button.danger{background:#fee2e2;border-color:#fecaca}
+    button.ghost{background:transparent}
+    button:hover{transform:translateY(-1px)}
+    button:disabled{opacity:.6;cursor:not-allowed;transform:none}
+    .pill{font-size:12px;padding:3px 10px;border-radius:999px;border:1px solid var(--line);background:#fff;color:#374151}
+    .pill.save{border-color:#bbf7d0;background:#ecfdf5}
+    .legend{display:flex;gap:8px;flex-wrap:wrap;padding:10px}
+    .legend span{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--line);border-radius:999px;background:#fff;font-size:13px}
+    /* Tree */
+    .tree{padding:8px 12px 14px 12px}
+    .row{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:12px}
+    .row:hover{background:#f6f8ff}
+    .toggle{width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:6px;font-size:12px;background:#fff;cursor:pointer}
+    .toggle.empty{opacity:.45}
+    .name{display:inline-flex;align-items:center;gap:10px;min-width:0}
+    .name input{font:inherit;border:1px solid var(--line);border-radius:10px;padding:6px 8px;min-width:140px}
+    .type{font-size:12px;color:#334155;background:#e2e8f0;border:1px solid #cbd5e1;border-radius:999px;padding:2px 8px}
+    .actions{margin-left:auto;display:flex;gap:6px;align-items:center}
+    .actions .sel{width:16px;height:16px}
+    .child{margin-left:28px;border-left:2px dashed #e5e7eb;padding-left:12px}
+    .empty-note{color:var(--muted);font-size:14px;padding:6px 8px}
+    /* Downloads styling */
+    .downloads .row{background:var(--brand-soft)}
+    .downloads .badge{background:#1d4ed8;color:#fff;border-radius:8px;padding:2px 8px;font-size:11px;margin-left:6px}
+    .downloads .toggle{border-color:#c7d2fe;background:#eef2ff}
+    /* Modal */
+    .modal{position:fixed;inset:0;background:rgba(0,0,0,.25);display:none;align-items:center;justify-content:center;padding:16px;z-index:50}
+    .dialog{background:#fff;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.25);max-width:760px;width:100%;overflow:hidden;border:1px solid var(--line)}
+    .dialog .head{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-bottom:1px solid var(--line)}
+    .dialog .body{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:12px 14px}
+    .dialog .foot{display:flex;justify-content:flex-end;gap:8px;padding:12px 14px;border-top:1px solid var(--line)}
+    .picker{border:1px solid var(--line);border-radius:12px;overflow:auto;max-height:360px;padding:8px}
+    .picker .row{cursor:pointer}
+    .picker .row.selected{background:#dbeafe}
+    .field{display:flex;flex-direction:column;gap:6px}
+    .field input{border:1px solid var(--line);border-radius:10px;padding:10px}
+    .error{color:var(--bad);font-size:12px;min-height:18px}
+    .path{font-size:12px;color:#374151;background:#f3f4f6;border-radius:999px;padding:2px 8px;display:inline-block}
+    @media (max-width: 960px){
+      .dialog .body{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <h1>🗂️ Mappenstudio</h1>
+      <div class="subtitle">Bouw een mappenstructuur, download voorbeeldbestanden en sla ze realistisch op met <em>Opslaan als…</em></div>
+    </div>
+  </header>
+
+  <!-- SECTION 1: Folder structure -->
+  <section class="section card" id="section-structure">
+    <div class="toolbar">
+      <div class="step"><span class="num">1</span> Maak je mappenstructuur</div>
+      <button id="addTopFolder" class="primary">+ Hoofdmap</button>
+      <button id="expandAll">Alles openen</button>
+      <button id="collapseAll">Alles sluiten</button>
+      <button id="reset" class="danger">🔄 Reset structuur</button>
+      <button id="saveAsSelected" disabled>💾 Opslaan als… (selectie)</button>
+      <span class="pill save" id="autosave">Auto-opslag aan</span>
+    </div>
+    <div class="legend">
+      <span>📁 Map</span>
+      <span>📄 Bestand</span>
+      <span>＋ Toevoegen (map/bestand)</span>
+      <span>✏️ Hernoemen</span>
+      <span>🗑️ Verwijderen</span>
+      <span>☑️ Selecteer bestand → Opslaan als…</span>
+    </div>
+    <div id="tree" class="tree"></div>
+    <div class="wrap" style="padding:0 12px 14px 12px;color:#475569">Tip: De map <strong>Downloads</strong> is blauw gemarkeerd, kan niet worden hernoemd of verwijderd, en is de plek waar nieuwe downloads terechtkomen.</div>
+  </section>
+
+  <!-- SECTION 2: Download center below -->
+  <section class="section card" id="section-downloads">
+    <div class="toolbar">
+      <div class="step"><span class="num">2</span> Download en verdeel je bestanden</div>
+    </div>
+    <div class="wrap" style="padding:12px">
+      <p style="margin-top:0;color:#475569">Vink voorbeeldbestanden aan en klik <em>Download geselecteerde</em>. Daarna vind je ze in <strong>Downloads</strong> en kun je ze met <em>Opslaan als…</em> een goede naam geven en in de juiste map plaatsen.</p>
+      <div id="dlList"></div>
+      <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+        <button id="downloadSelected" class="primary">⬇️ Download geselecteerde</button>
+        <button id="selectAllDl" class="ghost">Selecteer alles</button>
+        <button id="clearAllDl" class="ghost">Niets</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Save As modal -->
+  <div class="modal" id="saveAsModal" role="dialog" aria-modal="true" aria-labelledby="dlgTitle">
+    <div class="dialog">
+      <div class="head">
+        <strong id="dlgTitle">Opslaan als…</strong>
+        <span id="dlgFileCount" class="pill">1 bestand</span>
+      </div>
+      <div class="body">
+        <div>
+          <div style="margin-bottom:6px">Kies doelmap</div>
+          <div id="folderPicker" class="picker" aria-label="Kies doelmap"></div>
+        </div>
+        <div>
+          <div class="field">
+            <label for="filenameInput">Bestandsnaam (incl. extensie)</label>
+            <input id="filenameInput" type="text" placeholder="bijv. Rekensommen-jan.pdf">
+            <div class="error" id="filenameError"></div>
+            <div>Huidig pad: <span id="targetPath" class="path">/</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="foot">
+        <button id="dlgCancel">Annuleren</button>
+        <button id="dlgNext" class="primary">Opslaan</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  // ---------- Data model ----------
+  const uid = () => Math.random().toString(36).slice(2,9);
+  const TYPE = {FOLDER:'folder', FILE:'file'};
+  const STORAGE_KEY = 'mappenstudio.v1';
+  const DOWNLOADS_NAME = 'Downloads';
+
+  // initial state with protected Downloads
+  let state = load() || {
+    id: 'root', type: TYPE.FOLDER, name: 'Mijn computer', open: true, children: [
+      { id: uid(), type: TYPE.FOLDER, name: DOWNLOADS_NAME, open:true, children: [] },
+      { id: uid(), type: TYPE.FOLDER, name: 'School', open:true, children: [] },
+      { id: uid(), type: TYPE.FOLDER, name: 'Foto’s', open:false, children: [] }
+    ]
+  };
+
+  const treeEl = document.getElementById('tree');
+  const saveAsBtn = document.getElementById('saveAsSelected');
+  let selectedFiles = new Set(); // ids of selected files
+
+  // ---------- Persistence ----------
+  function save(){
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    pulse(document.getElementById('autosave'));
+  }
+  function load(){
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch(e){ return null; }
+  }
+  function pulse(el){
+    if(!el) return;
+    el.animate([{ transform:'scale(1)' },{ transform:'scale(1.06)' },{ transform:'scale(1)'}], {duration:350});
+  }
+
+  // ---------- Helpers ----------
+  function ensureDownloads(){
+    let d = state.children.find(x => x.type===TYPE.FOLDER && x.name===DOWNLOADS_NAME);
+    if(!d){
+      d = { id: uid(), type: TYPE.FOLDER, name: DOWNLOADS_NAME, open:true, children: [] };
+      state.children.unshift(d);
+    }
+    return d;
+  }
+  function findById(node, id){
+    if(node.id === id) return node;
+    if(node.type === TYPE.FOLDER && node.children){
+      for(const ch of node.children){
+        const found = findById(ch, id);
+        if(found) return found;
+      }
+    }
+    return null;
+  }
+  function parentOf(node, id){
+    if(!node.children) return null;
+    for(const ch of node.children){
+      if(ch.id === id) return node;
+      if(ch.type===TYPE.FOLDER){
+        const p = parentOf(ch, id);
+        if(p) return p;
+      }
+    }
+    return null;
+  }
+  function removeById(parent, id){
+    if(!parent.children) return false;
+    const i = parent.children.findIndex(x => x.id === id);
+    if(i >= 0){ parent.children.splice(i,1); return true; }
+    for(const ch of parent.children){
+      if(ch.type === 'folder' && removeById(ch, id)) return true;
+    }
+    return false;
+  }
+  function pathTo(node){
+    const path = [];
+    function walk(n, target, cur){
+      if(n === target){ path.push(...cur, n.name); return true; }
+      if(n.type===TYPE.FOLDER){
+        for(const ch of n.children){
+          if(walk(ch, target, cur.concat(n.name))) return true;
+        }
+      }
+      return false;
+    }
+    walk(state, node, []);
+    return '/'+path.filter(Boolean).join('/');
+  }
+  function uniqueNameIn(folder, base){
+    const names = new Set((folder.children||[]).map(ch=>ch.name));
+    if(!names.has(base)) return base;
+    const dot = base.lastIndexOf('.');
+    const pre = dot>0 ? base.slice(0,dot) : base;
+    const ext = dot>0 ? base.slice(dot) : '';
+    let i=1;
+    while(names.has(`${pre} (${i})${ext}`)) i++;
+    return `${pre} (${i})${ext}`;
+  }
+  function isDownloadsFolder(node){ return node && node.type===TYPE.FOLDER && node.name===DOWNLOADS_NAME; }
+
+  // ---------- Rendering FS ----------
+  function render(){
+    treeEl.innerHTML = '';
+    const d = ensureDownloads();
+    treeEl.appendChild(renderRoot(state));
+    saveAsBtn.disabled = selectedFiles.size === 0;
+  }
+
+  function renderRoot(root){
+    const wrap = document.createElement('div');
+    root.children.forEach(ch => {
+      if(ch.type===TYPE.FOLDER) wrap.appendChild(renderFolder(ch));
+      else wrap.appendChild(renderFile(ch));
+    });
+    return wrap;
+  }
+
+  function renderFolder(folder){
+    const isDownloads = isDownloadsFolder(folder);
+    const container = document.createElement('div');
+    if(isDownloads) container.classList.add('downloads');
+
+    const row = document.createElement('div'); row.className='row'; row.dataset.id = folder.id;
+    const toggle = document.createElement('button');
+    toggle.className = 'toggle' + ((folder.children && folder.children.length) ? '' : ' empty');
+    toggle.title = folder.open ? 'Sluiten' : 'Openen';
+    toggle.textContent = folder.open ? '▼' : '▶︎';
+    toggle.addEventListener('click', ()=>{ folder.open = !folder.open; save(); render(); });
+
+    const name = document.createElement('div'); name.className='name';
+    name.innerHTML = `📁 <span class="text"></span> <span class="type">map</span>` + (isDownloads ? ` <span class="badge">Downloads</span>` : '');
+    const textSpan = name.querySelector('.text'); textSpan.textContent = folder.name;
+    textSpan.title = isDownloads ? 'Downloads kan niet worden hernoemd' : 'Dubbelklik om te hernoemen';
+    if(!isDownloads){
+      textSpan.addEventListener('dblclick', () => startRename(folder, textSpan));
+    }
+
+    const actions = document.createElement('div'); actions.className='actions';
+    const plus = document.createElement('button'); plus.textContent = '＋'; plus.title = 'Toevoegen (map/bestand)';
+    plus.addEventListener('click', (e)=> openMenu(e, folder.id));
+    actions.append(plus);
+    if(!isDownloads){
+      const rename = document.createElement('button'); rename.textContent='✏️'; rename.title='Naam wijzigen';
+      rename.addEventListener('click', ()=> startRename(folder, textSpan));
+      const del = document.createElement('button'); del.textContent='🗑️'; del.title='Verwijderen';
+      del.addEventListener('click', ()=> deleteNode(folder.id));
+      actions.append(rename, del);
+    }
+
+    row.append(toggle, name, actions);
+    container.appendChild(row);
+
+    if(folder.open){
+      const childBox = document.createElement('div'); childBox.className='child';
+      if(!folder.children || folder.children.length===0){
+        const empty = document.createElement('div'); empty.className='empty-note'; empty.textContent = 'Lege map';
+        childBox.appendChild(empty);
+      } else {
+        folder.children.forEach(ch => {
+          if(ch.type === TYPE.FOLDER) childBox.appendChild(renderFolder(ch));
+          else childBox.appendChild(renderFile(ch));
+        });
+      }
+      container.appendChild(childBox);
+    }
+    return container;
+  }
+
+  function renderFile(file){
+    const row = document.createElement('div'); row.className='row'; row.dataset.id = file.id;
+    const toggle = document.createElement('span'); toggle.className='toggle empty'; toggle.textContent='•'; toggle.title='Bestand';
+
+    const name = document.createElement('div'); name.className='name'; name.innerHTML = `📄 <span class="text"></span> <span class="type">bestand</span>`;
+    const textSpan = name.querySelector('.text'); textSpan.textContent = file.name;
+    textSpan.title = 'Dubbelklik om te hernoemen';
+    textSpan.addEventListener('dblclick', () => startRename(file, textSpan));
+
+    const actions = document.createElement('div'); actions.className='actions';
+    const sel = document.createElement('input'); sel.type='checkbox'; sel.className='sel'; sel.title='Selecteer voor Opslaan als…';
+    sel.checked = selectedFiles.has(file.id);
+    sel.addEventListener('change', ()=>{
+      if(sel.checked) selectedFiles.add(file.id); else selectedFiles.delete(file.id);
+      saveAsBtn.disabled = selectedFiles.size === 0;
+    });
+
+    const saveAs = document.createElement('button'); saveAs.textContent='💾 Opslaan als…';
+    saveAs.addEventListener('click', ()=> openSaveAs([file.id]));
+
+    const rename = document.createElement('button'); rename.textContent='✏️'; rename.title='Naam wijzigen';
+    rename.addEventListener('click', ()=> startRename(file, textSpan));
+
+    const del = document.createElement('button'); del.textContent='🗑️'; del.title='Verwijderen';
+    del.addEventListener('click', ()=> deleteNode(file.id));
+
+    actions.append(sel, saveAs, rename, del);
+    row.append(toggle, name, actions);
+    return row;
+  }
+
+  // ---------- Context menu for folders ----------
+  const menuEl = (()=>{
+    const m = document.createElement('div');
+    m.className='menu'; m.style.position='absolute'; m.style.display='none';
+    m.style.background = '#fff'; m.style.border = '1px solid var(--line)';
+    m.style.borderRadius='12px'; m.style.boxShadow='0 8px 24px rgba(0,0,0,.12)'; m.style.padding='6px';
+    m.innerHTML = `<button data-action="new-folder">📁 Map aanmaken</button>
+                   <button data-action="new-file">📄 Bestand aanmaken</button>`;
+    document.body.appendChild(m);
+    return m;
+  })();
+  let menuTargetId = null;
+  function openMenu(ev, targetId){
+    menuTargetId = targetId;
+    const rect = ev.currentTarget.getBoundingClientRect();
+    menuEl.style.left = (rect.left) + 'px';
+    menuEl.style.top = (rect.bottom + 6) + 'px';
+    menuEl.style.display = 'block';
+    const close = (e) => {
+      if(!menuEl.contains(e.target)){ menuEl.style.display='none'; document.removeEventListener('mousedown', close); }
+    };
+    setTimeout(()=> document.addEventListener('mousedown', close), 0);
+  }
+  menuEl.addEventListener('click', (e) => {
+    const act = e.target.getAttribute('data-action');
+    if(!act || !menuTargetId) return;
+    const parent = findById(state, menuTargetId);
+    if(!parent || parent.type !== TYPE.FOLDER) return;
+    const name = prompt(act==='new-folder' ? 'Naam van nieuwe map:' : 'Naam van nieuw bestand:');
+    if(!name) { menuEl.style.display='none'; return; }
+    parent.children = parent.children || [];
+    parent.children.push({
+      id: uid(),
+      type: act==='new-folder' ? TYPE.FOLDER : TYPE.FILE,
+      name: name.trim(),
+      open: act==='new-folder' ? false : undefined,
+      children: act==='new-folder' ? [] : undefined
+    });
+    menuEl.style.display='none';
+    save(); render();
+  });
+
+  function startRename(node, textSpan){
+    // protect Downloads
+    if(node.type===TYPE.FOLDER && isDownloadsFolder(node)) return alert('Downloads kan niet worden hernoemd.');
+    const input = document.createElement('input');
+    input.value = node.name;
+    textSpan.replaceWith(input);
+    input.focus(); input.select();
+    const finish = (ok) => {
+      const span = document.createElement('span'); span.className='text';
+      span.textContent = ok ? input.value.trim() || node.name : node.name;
+      node.name = span.textContent;
+      span.title = 'Dubbelklik om te hernoemen';
+      span.addEventListener('dblclick', () => startRename(node, span));
+      input.replaceWith(span);
+      save();
+    };
+    input.addEventListener('keydown', (e)=>{
+      if(e.key === 'Enter'){ finish(true); }
+      if(e.key === 'Escape'){ finish(false); }
+    });
+    input.addEventListener('blur', ()=> finish(true));
+  }
+
+  function deleteNode(id){
+    const node = findById(state, id);
+    if(node && isDownloadsFolder(node)){
+      alert('De map Downloads kan niet worden verwijderd.');
+      return;
+    }
+    if(!confirm('Weet je zeker dat je dit wilt verwijderen?')) return;
+    const ok = removeById(state, id);
+    if(ok){ save(); render(); }
+  }
+
+  // ---------- Toolbar ----------
+  document.getElementById('addTopFolder').addEventListener('click', ()=>{
+    const name = prompt('Naam van nieuwe hoofdmap:');
+    if(!name) return;
+    state.children.push({ id: uid(), type: TYPE.FOLDER, name: name.trim(), open: true, children: [] });
+    save(); render();
+  });
+  document.getElementById('expandAll').addEventListener('click', ()=>{
+    walk(state, n => { if(n.type===TYPE.FOLDER) n.open = true; });
+    save(); render();
+  });
+  document.getElementById('collapseAll').addEventListener('click', ()=>{
+    walk(state, n => { if(n.type===TYPE.FOLDER) n.open = false; });
+    state.open = true; // root open
+    save(); render();
+  });
+  document.getElementById('reset').addEventListener('click', ()=>{
+    if(!confirm('Alles resetten? Je verliest je huidige structuur.')) return;
+    state = { id:'root', type:TYPE.FOLDER, name:'Mijn computer', open:true, children:[
+      { id: uid(), type: TYPE.FOLDER, name: DOWNLOADS_NAME, open:true, children: [] }
+    ] };
+    selectedFiles.clear();
+    save(); render();
+  });
+  saveAsBtn.addEventListener('click', ()=> openSaveAs([...selectedFiles]));
+
+  // ---------- Download Center ----------
+  const DOWNLOAD_CATALOG = [
+    {name:'Rekensommen-jan.pdf'}, {name:'Toets-taal-maart.docx'}, {name:'Klasfoto.png'},
+    {name:'Vakantie2023-strand.jpg'}, {name:'Kat_Miep.png'}, {name:'muziek-liedje.mp3'},
+    {name:'leeg-document.txt'}
+  ];
+  const dlList = document.getElementById('dlList');
+  const dlSel = new Set();
+  function renderDownloads(){
+    dlList.innerHTML='';
+    DOWNLOAD_CATALOG.forEach((it, idx)=>{
+      const row = document.createElement('label'); row.className='row'; row.style.border='1px solid var(--line)'; row.style.borderRadius='12px'; row.style.background='#fff'; row.style.margin='8px 0';
+      const cb = document.createElement('input'); cb.type='checkbox'; cb.checked = dlSel.has(idx); cb.style.marginRight='8px';
+      cb.addEventListener('change', ()=>{ if(cb.checked) dlSel.add(idx); else dlSel.delete(idx); });
+      const nm = document.createElement('div'); nm.innerHTML = `📄 <strong>${it.name}</strong><br><span style="color:var(--muted);font-size:12px">voorbeeldbestand</span>`;
+      row.append(cb, nm);
+      dlList.appendChild(row);
+    });
+  }
+  function downloadsFolder(){
+    return ensureDownloads();
+  }
+  document.getElementById('downloadSelected').addEventListener('click', ()=>{
+    if(dlSel.size===0){ alert('Selecteer eerst één of meer voorbeeldbestanden.'); return; }
+    const d = downloadsFolder();
+    d.children = d.children || [];
+    [...dlSel].forEach(i=>{
+      const base = DOWNLOAD_CATALOG[i].name;
+      const name = uniqueNameIn(d, base);
+      d.children.push({ id: uid(), type: TYPE.FILE, name });
+    });
+    dlSel.clear();
+    renderDownloads();
+    save(); render();
+  });
+  document.getElementById('selectAllDl').addEventListener('click', ()=>{
+    dlSel.clear(); DOWNLOAD_CATALOG.forEach((_,i)=> dlSel.add(i)); renderDownloads();
+  });
+  document.getElementById('clearAllDl').addEventListener('click', ()=>{ dlSel.clear(); renderDownloads(); });
+  renderDownloads();
+
+  // ---------- Save As dialog ----------
+  const modal = document.getElementById('saveAsModal');
+  const pickerEl = document.getElementById('folderPicker');
+  const dlgTitleCount = document.getElementById('dlgFileCount');
+  const filenameInput = document.getElementById('filenameInput');
+  const filenameError = document.getElementById('filenameError');
+  const targetPathEl = document.getElementById('targetPath');
+  const dlgNext = document.getElementById('dlgNext');
+  const dlgCancel = document.getElementById('dlgCancel');
+
+  let queue = []; // array of file ids to process
+  let queueIndex = 0;
+  let targetFolderId = null;
+
+  function openSaveAs(fileIds){
+    if(fileIds.length===0) return;
+    queue = fileIds.slice();
+    queueIndex = 0;
+    renderPicker();
+    pickerSelect(findDownloadsId()); // default selection: Downloads
+    showForCurrent();
+    modal.style.display='flex';
+  }
+
+  function findDownloadsId(){
+    const d = ensureDownloads();
+    return d?.id;
+  }
+
+  function showForCurrent(){
+    const fileId = queue[queueIndex];
+    const f = findById(state, fileId);
+    if(!f){ closeModal(); return; }
+    dlgTitleCount.textContent = `${queueIndex+1}/${queue.length} bestand${queue.length>1?'en':''}`;
+    filenameInput.value = f.name;
+    filenameError.textContent='';
+    targetPathEl.textContent = pathTo(findById(state, targetFolderId));
+    filenameInput.focus(); filenameInput.select();
+  }
+
+  function renderPicker(){
+    pickerEl.innerHTML='';
+    const list = document.createElement('div');
+    walk(state, n => {
+      if(n.type===TYPE.FOLDER){
+        const row = document.createElement('div'); row.className='row'; row.dataset.id = n.id;
+        const label = isDownloadsFolder(n) ? `${pathTo(n)} <span class="badge" style="margin-left:8px;background:#1d4ed8;color:#fff;padding:2px 6px;border-radius:8px;font-size:11px">Downloads</span>` : pathTo(n);
+        row.innerHTML = `📁 ${label}`;
+        row.addEventListener('click', ()=> pickerSelect(n.id));
+        list.appendChild(row);
+      }
+    });
+    pickerEl.appendChild(list);
+  }
+
+  function pickerSelect(id){
+    targetFolderId = id;
+    pickerEl.querySelectorAll('.row').forEach(r => r.classList.toggle('selected', r.dataset.id === id));
+    const folder = findById(state, id);
+    targetPathEl.textContent = pathTo(folder);
+  }
+
+  function closeModal(){
+    modal.style.display='none';
+    queue = []; queueIndex=0; targetFolderId=null;
+  }
+
+  function validateFilename(name){
+    if(!name || !name.trim()) return 'Geef een bestandsnaam.';
+    if(!name.includes('.')) return 'Voeg een extensie toe (bijv. .pdf, .docx, .png).';
+    if(/[\\/:*?"<>|]/.test(name)) return 'Naam bevat ongeldige tekens (\\ / : * ? " < > |).';
+    return '';
+  }
+
+  function performSave(){
+    const fileId = queue[queueIndex];
+    const file = findById(state, fileId);
+    const target = findById(state, targetFolderId);
+    if(!file || !target) return false;
+
+    const err = validateFilename(filenameInput.value.trim());
+    if(err){ filenameError.textContent = err; return false; }
+    const newName = filenameInput.value.trim();
+
+    // Conflict check
+    const exists = (target.children||[]).some(ch => ch.type===TYPE.FILE && ch.name===newName);
+    if(exists){
+      if(!confirm(`'${newName}' bestaat al in ${pathTo(target)}. Overschrijven?`)) return false;
+      const idx = target.children.findIndex(ch => ch.type===TYPE.FILE && ch.name===newName);
+      if(idx>=0) target.children.splice(idx,1);
+    }
+    // Move file
+    const parent = parentOf(state, fileId);
+    if(parent){ removeById(parent, fileId); }
+    target.children = target.children || [];
+    target.children.push({ id: uid(), type: TYPE.FILE, name: newName });
+
+    queueIndex++;
+    if(queueIndex >= queue.length){
+      save(); render(); closeModal(); selectedFiles.clear(); return true;
+    } else {
+      save(); renderPicker();
+      showForCurrent();
+      return true;
+    }
+  }
+
+  dlgNext.addEventListener('click', performSave);
+  dlgCancel.addEventListener('click', closeModal);
+  modal.addEventListener('click', (e)=>{ if(e.target === modal) closeModal(); });
+
+  // ---------- Utility ----------
+  function walk(node, fn){
+    fn(node);
+    if(node.type===TYPE.FOLDER && node.children){
+      node.children.forEach(ch=>walk(ch, fn));
+    }
+  }
+
+  // ---------- Init ----------
+  render();
+})();
+</script>
+</body>
+</html>
+"""
+path = "/mnt/data/mappenstudio_opslaan_v2.html"
+with open(path, "w", encoding="utf-8") as f:
+    f.write(html)
